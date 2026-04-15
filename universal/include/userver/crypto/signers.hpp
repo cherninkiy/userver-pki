@@ -11,6 +11,7 @@
 
 #include <userver/utils/flags.hpp>
 
+#include <userver/crypto/backend_traits.hpp>
 #include <userver/crypto/basic_types.hpp>
 #include <userver/crypto/certificate.hpp>
 #include <userver/crypto/exception.hpp>
@@ -40,7 +41,7 @@ public:
 };
 
 /// HMAC-SHA signer
-template <DigestSize Bits>
+template <DigestSize Bits, typename Backend = DefaultBackend>
 class HmacShaSigner final : public Signer {
 public:
     /// Constructor from a shared secret
@@ -63,7 +64,7 @@ using SignerHs512 = HmacShaSigner<DigestSize::k512>;
 /// @}
 
 /// Generic signer for asymmetric cryptography
-template <DsaType Type, DigestSize Bits>
+template <DsaType Type, DigestSize Bits, typename Backend = DefaultBackend>
 class DsaSigner final : public Signer {
 public:
     /// Constructor from a PEM-encoded private key and an optional passphrase
@@ -78,7 +79,7 @@ public:
     std::string SignDigest(std::string_view digest) const;
 
 private:
-    PrivateKey pkey_;
+    BasicPrivateKey<Backend> pkey_;
 };
 
 /// @name Outputs RSASSA signature using SHA-2 and PKCS1 padding.

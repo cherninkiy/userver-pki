@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-#include <userver/crypto/basic_types.hpp>
+#include <userver/crypto/openssl_backend.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -17,12 +17,16 @@ namespace crypto {
 
 /// @ingroup userver_universal userver_containers
 ///
-/// Loaded into memory X509 certificate
-class Certificate {
+/// Loaded into memory X509 certificate parameterised on the crypto backend.
+///
+/// The default backend is `DefaultBackend` (OpenSSL).  Use the
+/// `Certificate` alias for the common case.
+template <typename Backend = DefaultBackend>
+class BasicCertificate {
 public:
-    using NativeType = X509;
+    using NativeType = typename Backend::NativeCertHandle;
 
-    Certificate() = default;
+    BasicCertificate() = default;
 
     NativeType* GetNative() const noexcept { return cert_.get(); }
     explicit operator bool() const noexcept { return !!cert_; }
@@ -30,28 +34,43 @@ public:
     /// Returns a PEM-encoded representation of stored certificate.
     ///
     /// @throw crypto::SerializationError if serialization fails.
-    std::optional<std::string> GetPemString() const;
+    std::optional<std::string> GetPemString() const {
+        return Backend::GetCertificatePem(cert_.get());
+    }
 
     /// Accepts a string that contains a certificate, checks that
-    /// it's correct, loads it into OpenSSL structures and returns as a
-    /// Certificate variable.
+    /// it's correct, loads it into backend structures and returns as a
+    /// BasicCertificate variable.
     ///
     /// @throw crypto::KeyParseError if failed to load the certificate.
-    static Certificate LoadFromString(std::string_view certificate);
-    /// Loads the certificate and skips the meta information in it
+    static BasicCertificate LoadFromString(std::string_view certificate) {
+        Backend::Init();
+        return BasicCertificate{Backend::LoadNativeCertificate(certificate)};
+    }
+
+    /// Loads the certificate and skips the meta information in it.
+    ///
     /// @throw crypto::KeyParseError if failed to load the certificate.
-    static Certificate LoadFromStringSkippingAttributes(std::string_view certificate);
+    static BasicCertificate LoadFromStringSkippingAttributes(std::string_view certificate) {
+        Backend::Init();
+        return BasicCertificate{Backend::LoadNativeCertificateSkippingAttributes(certificate)};
+    }
 
     /// Returns Subject
-    std::string GetSubject() const;
+    std::string GetSubject() const {
+        return Backend::GetCertificateSubject(cert_.get());
+    }
 
 private:
-    explicit Certificate(std::shared_ptr<NativeType> cert)
+    explicit BasicCertificate(std::shared_ptr<NativeType> cert)
         : cert_(std::move(cert))
     {}
 
     std::shared_ptr<NativeType> cert_;
 };
+
+/// @brief Backward-compatible alias for the OpenSSL-backed certificate type.
+using Certificate = BasicCertificate<>;
 
 using CertificatesChain = std::list<Certificate>;
 

@@ -6,21 +6,24 @@
 #include <memory>
 #include <string_view>
 
-#include <userver/crypto/basic_types.hpp>
+#include <userver/crypto/certificate.hpp>
+#include <userver/crypto/openssl_backend.hpp>
 #include <userver/utils/strong_typedef.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace crypto {
 
-class Certificate;
-
 /// @ingroup userver_universal userver_containers
 ///
-/// Loaded into memory public key
-class PublicKey {
+/// Loaded into memory public key parameterised on the crypto backend.
+///
+/// The default backend is `DefaultBackend` (OpenSSL).  Use the
+/// `PublicKey` alias for the common case.
+template <typename Backend = DefaultBackend>
+class BasicPublicKey {
 public:
-    using NativeType = EVP_PKEY;
+    using NativeType = typename Backend::NativeKeyHandle;
 
     /// Modulus wrapper
     using ModulusView = utils::StrongTypedef<class ModulusTag, std::string_view>;
@@ -32,40 +35,56 @@ public:
 
     using CurveTypeView = utils::StrongTypedef<class CurveTypeTag, std::string_view>;
 
-    PublicKey() = default;
+    BasicPublicKey() = default;
 
     NativeType* GetNative() const noexcept { return pkey_.get(); }
     explicit operator bool() const noexcept { return !!pkey_; }
 
     /// Accepts a string that contains a certificate or public key, checks that
-    /// it's correct, loads it into OpenSSL structures and returns as a
-    /// PublicKey variable.
+    /// it's correct, loads it into backend structures and returns as a
+    /// BasicPublicKey variable.
     ///
     /// @throw crypto::KeyParseError if failed to load the key.
-    static PublicKey LoadFromString(std::string_view key);
+    static BasicPublicKey LoadFromString(std::string_view key) {
+        Backend::Init();
+        return BasicPublicKey{Backend::LoadNativePublicKey(key)};
+    }
 
-    /// Extracts PublicKey from certificate.
+    /// Extracts BasicPublicKey from certificate.
     ///
     /// @throw crypto::KeyParseError if failed to load the key.
-    static PublicKey LoadFromCertificate(const Certificate& cert);
+    static BasicPublicKey LoadFromCertificate(const BasicCertificate<Backend>& cert) {
+        return BasicPublicKey{Backend::LoadNativePublicKeyFromCertificate(cert.GetNative())};
+    }
 
-    /// Creates RSA PublicKey from components
+    /// Creates RSA BasicPublicKey from components
     ///
     /// @throw crypto::KeyParseError if failed to load the key.
-    static PublicKey LoadRSAFromComponents(ModulusView modulus, ExponentView exponent);
+    static BasicPublicKey LoadRSAFromComponents(ModulusView modulus, ExponentView exponent) {
+        return BasicPublicKey{Backend::LoadNativeRSAPublicKeyFromComponents(
+            modulus.GetUnderlying(), exponent.GetUnderlying()
+        )};
+    }
 
-    /// Creates EC PublicKey from components
+    /// Creates EC BasicPublicKey from components
     ///
     /// @throw crypto::KeyParseError if failed to load the key.
-    static PublicKey LoadECFromComponents(CurveTypeView curve, CoordinateView x, CoordinateView y);
+    static BasicPublicKey LoadECFromComponents(CurveTypeView curve, CoordinateView x, CoordinateView y) {
+        return BasicPublicKey{Backend::LoadNativeECPublicKeyFromComponents(
+            curve.GetUnderlying(), x.GetUnderlying(), y.GetUnderlying()
+        )};
+    }
 
 private:
-    explicit PublicKey(std::shared_ptr<NativeType> pkey)
+    explicit BasicPublicKey(std::shared_ptr<NativeType> pkey)
         : pkey_(std::move(pkey))
     {}
 
     std::shared_ptr<NativeType> pkey_;
 };
+
+/// @brief Backward-compatible alias for the OpenSSL-backed public key type.
+using PublicKey = BasicPublicKey<>;
 
 }  // namespace crypto
 
