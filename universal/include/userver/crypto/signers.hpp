@@ -148,14 +148,20 @@ private:
 
 namespace weak {
 
+/// @deprecated SHA-1 is cryptographically broken (NIST deprecated by Dec 2030).
+/// Use `SignerRs256` or a stronger algorithm instead.
 /// Outputs RSASSA signature using SHA-1 and PKCS1 padding.
-using SignerRs1 = DsaSigner<DsaType::kRsa, DigestSize::k160>;
+[[deprecated("SHA-1 is cryptographically broken; use SignerRs256 or stronger.")]]
+typedef DsaSigner<DsaType::kRsa, DigestSize::k160> SignerRs1;
 
-/// Outputs RSASSA signature using SHA-2 and PSS padding.
+/// @deprecated SHA-1 is cryptographically broken (NIST deprecated by Dec 2030).
+/// Use `SignerPs256` or a stronger algorithm instead.
+/// Outputs RSASSA signature using SHA-1 and PSS padding.
 ///
 /// JWA specifications require using MGF1 function with the same hash function
 /// as for the digest and salt length to be the same size as the hash output.
-using SignerPs1 = DsaSigner<DsaType::kRsaPss, DigestSize::k160>;
+[[deprecated("SHA-1 is cryptographically broken; use SignerPs256 or stronger.")]]
+typedef DsaSigner<DsaType::kRsaPss, DigestSize::k160> SignerPs1;
 
 }  // namespace weak
 }  // namespace crypto

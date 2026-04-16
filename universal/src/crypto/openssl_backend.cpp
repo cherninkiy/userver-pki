@@ -349,6 +349,12 @@ void OpenSslBackend::Init() noexcept {
     Openssl::Init();
 }
 
+void OpenSslBackend::Cleanup() noexcept {
+#if OPENSSL_VERSION_NUMBER >= 0x010100000L
+    OPENSSL_cleanup();
+#endif
+}
+
 void OpenSslBackend::SecureClear(std::string& s) noexcept {
     OPENSSL_cleanse(s.data(), s.size());
 }

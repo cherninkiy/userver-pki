@@ -139,14 +139,20 @@ private:
 
 namespace weak {
 
+/// @deprecated SHA-1 is cryptographically broken (NIST deprecated by Dec 2030).
+/// Use `VerifierRs256` or a stronger algorithm instead.
 /// Verifies RSASSA signature using SHA-1 and PKCS1 padding.
-using VerifierRs1 = DsaVerifier<DsaType::kRsa, DigestSize::k160>;
+[[deprecated("SHA-1 is cryptographically broken; use VerifierRs256 or stronger.")]]
+typedef DsaVerifier<DsaType::kRsa, DigestSize::k160> VerifierRs1;
 
+/// @deprecated SHA-1 is cryptographically broken (NIST deprecated by Dec 2030).
+/// Use `VerifierPs256` or a stronger algorithm instead.
 /// Verifies RSASSA signature using SHA-1 and PSS padding.
 ///
 /// JWA specifications require using MGF1 function with the same hash function
 /// as for the digest and salt length to be the same size as the hash output.
-using VerifierPs1 = DsaVerifier<DsaType::kRsaPss, DigestSize::k160>;
+[[deprecated("SHA-1 is cryptographically broken; use VerifierPs256 or stronger.")]]
+typedef DsaVerifier<DsaType::kRsaPss, DigestSize::k160> VerifierPs1;
 
 }  // namespace weak
 }  // namespace crypto

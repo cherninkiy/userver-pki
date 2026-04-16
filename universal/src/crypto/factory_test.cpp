@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <userver/crypto/crypto_factory.hpp>
+#include <userver/crypto/exception.hpp>
 #include <userver/crypto/null_backend.hpp>
 #include <userver/crypto/openssl_backend.hpp>
 
@@ -18,29 +19,40 @@ TEST(NullCryptoBackend, ConceptSatisfied) {
 }
 
 TEST(NullCryptoBackend, InitIsNoOp) {
-    // Should not throw
     EXPECT_NO_THROW(NullCryptoBackend::Init());
 }
 
-TEST(NullCryptoBackend, DoSignReturnsEmpty) {
+TEST(NullCryptoBackend, CleanupIsNoOp) {
+    EXPECT_NO_THROW(NullCryptoBackend::Cleanup());
+}
+
+TEST(NullCryptoBackend, DoSignReturnsDummySignature) {
     NullKeyHandle key;
     const std::string sig =
         NullCryptoBackend::DoSign<DsaType::kRsa, DigestSize::k256>(&key, {"hello"});
-    EXPECT_TRUE(sig.empty());
+    EXPECT_EQ(sig, "null_signature");
 }
 
-TEST(NullCryptoBackend, DoVerifyIsNoOp) {
+TEST(NullCryptoBackend, DoVerifyAcceptsCorrectSignature) {
     NullKeyHandle key;
     EXPECT_NO_THROW(
-        NullCryptoBackend::DoVerify<DsaType::kRsa, DigestSize::k256>(&key, {"hello"}, "sig")
+        NullCryptoBackend::DoVerify<DsaType::kRsa, DigestSize::k256>(&key, {"hello"}, "null_signature")
     );
 }
 
-TEST(NullCryptoBackend, DoSignDigestReturnsEmpty) {
+TEST(NullCryptoBackend, DoVerifyRejectsWrongSignature) {
+    NullKeyHandle key;
+    EXPECT_THROW(
+        NullCryptoBackend::DoVerify<DsaType::kRsa, DigestSize::k256>(&key, {"hello"}, "wrong_sig"),
+        VerificationError
+    );
+}
+
+TEST(NullCryptoBackend, DoSignDigestReturnsDummySignature) {
     NullKeyHandle key;
     const std::string sig =
         NullCryptoBackend::DoSignDigest<DsaType::kRsa, DigestSize::k256>(&key, "digest");
-    EXPECT_TRUE(sig.empty());
+    EXPECT_EQ(sig, "null_signature");
 }
 
 TEST(NullCryptoBackend, ComputeHashReturnsEmpty) {
@@ -56,12 +68,18 @@ TEST(NullCryptoBackend, ComputeHmacReturnsEmpty) {
     EXPECT_TRUE(h.empty());
 }
 
+TEST(NullCryptoBackend, LoadMethodsReturnSameStaticHandle) {
+    // All calls with the same key type should return the same shared_ptr address
+    auto k1 = NullCryptoBackend::LoadNativePrivateKey("pem", "");
+    auto k2 = NullCryptoBackend::LoadNativePrivateKey("other-pem", "pwd");
+    EXPECT_EQ(k1.get(), k2.get());
+}
+
 // ---------------------------------------------------------- CryptoFactory<Null>
 
 TEST(CryptoFactoryNull, LoadPrivateKeyReturnsStub) {
     // NullCryptoBackend::LoadNativePrivateKey returns a non-null shared_ptr
     auto key = CryptoFactory<NullCryptoBackend>::LoadPrivateKey("fake-pem", "fake-pwd");
-    // operator bool is true because the shared_ptr inside is non-null
     EXPECT_TRUE(static_cast<bool>(key));
 }
 
@@ -82,17 +100,23 @@ TEST(CryptoFactoryNull, ComputeHashReturnsEmpty) {
     EXPECT_TRUE(h.empty());
 }
 
-TEST(CryptoFactoryNull, MakeSignerSignsEmpty) {
+TEST(CryptoFactoryNull, MakeSignerSignsDummySignature) {
     auto signer =
         CryptoFactory<NullCryptoBackend>::MakeSigner<DsaType::kRsa, DigestSize::k256>("fake-pem");
     const auto sig = signer.Sign({"hello"});
-    EXPECT_TRUE(sig.empty());
+    EXPECT_EQ(sig, "null_signature");
 }
 
-TEST(CryptoFactoryNull, MakeVerifierVerifiesNoOp) {
+TEST(CryptoFactoryNull, MakeVerifierAcceptsNullSignature) {
     auto verifier =
         CryptoFactory<NullCryptoBackend>::MakeVerifier<DsaType::kRsa, DigestSize::k256>("fake-pem");
-    EXPECT_NO_THROW(verifier.Verify({"hello"}, "any-signature"));
+    EXPECT_NO_THROW(verifier.Verify({"hello"}, "null_signature"));
+}
+
+TEST(CryptoFactoryNull, MakeVerifierRejectsWrongSignature) {
+    auto verifier =
+        CryptoFactory<NullCryptoBackend>::MakeVerifier<DsaType::kRsa, DigestSize::k256>("fake-pem");
+    EXPECT_THROW(verifier.Verify({"hello"}, "bad_signature"), VerificationError);
 }
 
 }  // namespace

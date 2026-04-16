@@ -2,9 +2,15 @@
 
 /// @file userver/crypto/null_backend.hpp
 /// @brief Stub CryptoBackend for use in tests where real cryptography is not
-/// needed.  All operations are no-ops / return empty values and never throw.
+/// needed.
 ///
-/// @note This backend must **not** be used in production.
+/// `DoSign`/`DoSignDigest` always return the fixed string `"null_signature"`.
+/// `DoVerify`/`DoVerifyDigest` throw `crypto::VerificationError` unless the
+/// provided signature equals `"null_signature"`.  This prevents tests from
+/// accidentally accepting any signature as valid.
+///
+/// @warning This backend must **not** be used in production — it provides
+/// **no real cryptographic security**.
 
 #include <initializer_list>
 #include <memory>
@@ -13,6 +19,7 @@
 #include <string_view>
 
 #include <userver/crypto/backend_traits.hpp>
+#include <userver/crypto/exception.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -42,26 +49,42 @@ struct NullCryptoBackend {
     // ------------------------------------------------------------ lifecycle
     static void Init() noexcept {}
 
+    /// No-op: NullCryptoBackend holds no global resources.
+    static void Cleanup() noexcept {}
+
     // ------------------------------------------------------------ DSA sign
 
+    /// Returns the fixed sentinel `"null_signature"` for all inputs.
     template <DsaType /*Type*/, DigestSize /*Bits*/>
     static std::string DoSign(NativeKeyHandle* /*key*/, std::initializer_list<std::string_view> /*data*/) {
-        return {};
+        return "null_signature";
     }
 
+    /// Returns the fixed sentinel `"null_signature"` for all inputs.
     template <DsaType /*Type*/, DigestSize /*Bits*/>
     static std::string DoSignDigest(NativeKeyHandle* /*key*/, std::string_view /*digest*/) {
-        return {};
+        return "null_signature";
     }
 
     // ----------------------------------------------------------- DSA verify
 
+    /// Throws `crypto::VerificationError` if @p sig != `"null_signature"`.
+    /// This prevents tests from silently accepting arbitrary signatures.
     template <DsaType /*Type*/, DigestSize /*Bits*/>
     static void
-    DoVerify(NativeKeyHandle* /*key*/, std::initializer_list<std::string_view> /*data*/, std::string_view /*sig*/) {}
+    DoVerify(NativeKeyHandle* /*key*/, std::initializer_list<std::string_view> /*data*/, std::string_view sig) {
+        if (sig != "null_signature") {
+            throw VerificationError("NullCryptoBackend: signature does not match sentinel \"null_signature\"");
+        }
+    }
 
+    /// Throws `crypto::VerificationError` if @p sig != `"null_signature"`.
     template <DsaType /*Type*/, DigestSize /*Bits*/>
-    static void DoVerifyDigest(NativeKeyHandle* /*key*/, std::string_view /*digest*/, std::string_view /*sig*/) {}
+    static void DoVerifyDigest(NativeKeyHandle* /*key*/, std::string_view /*digest*/, std::string_view sig) {
+        if (sig != "null_signature") {
+            throw VerificationError("NullCryptoBackend: signature does not match sentinel \"null_signature\"");
+        }
+    }
 
     // ----------------------------------------------------------------- hash
 
@@ -89,39 +112,53 @@ struct NullCryptoBackend {
 
     // ------------------------------------------ secure memory helpers
 
+    /// @note This method is a **test stub** — `s.clear()` does not overwrite
+    /// the underlying memory.  Do **not** use `NullCryptoBackend` in production
+    /// code that requires secure memory erasure.
     static void SecureClear(std::string& s) noexcept { s.clear(); }
 
     // ------------------------------------------ native handle loading
+    // All load methods return a shared pointer to a static dummy object so that
+    // repeated calls return the same address.  This mirrors the behaviour of
+    // real backends that cache handles for identical key material and avoids
+    // surprising tests that compare handles by address.
 
     static std::shared_ptr<NativeKeyHandle>
     LoadNativePrivateKey(std::string_view /*pem*/, std::string_view /*password*/) {
-        return std::make_shared<NativeKeyHandle>();
+        static auto dummy = std::make_shared<NativeKeyHandle>();
+        return dummy;
     }
 
     static std::shared_ptr<NativeKeyHandle> LoadNativePublicKey(std::string_view /*pem*/) {
-        return std::make_shared<NativeKeyHandle>();
+        static auto dummy = std::make_shared<NativeKeyHandle>();
+        return dummy;
     }
 
     static std::shared_ptr<NativeKeyHandle> LoadNativePublicKeyFromCertificate(const NativeCertHandle* /*cert*/) {
-        return std::make_shared<NativeKeyHandle>();
+        static auto dummy = std::make_shared<NativeKeyHandle>();
+        return dummy;
     }
 
     static std::shared_ptr<NativeKeyHandle>
     LoadNativeRSAPublicKeyFromComponents(std::string_view /*modulus*/, std::string_view /*exponent*/) {
-        return std::make_shared<NativeKeyHandle>();
+        static auto dummy = std::make_shared<NativeKeyHandle>();
+        return dummy;
     }
 
     static std::shared_ptr<NativeKeyHandle>
     LoadNativeECPublicKeyFromComponents(std::string_view /*curve*/, std::string_view /*x*/, std::string_view /*y*/) {
-        return std::make_shared<NativeKeyHandle>();
+        static auto dummy = std::make_shared<NativeKeyHandle>();
+        return dummy;
     }
 
     static std::shared_ptr<NativeCertHandle> LoadNativeCertificate(std::string_view /*pem*/) {
-        return std::make_shared<NativeCertHandle>();
+        static auto dummy = std::make_shared<NativeCertHandle>();
+        return dummy;
     }
 
     static std::shared_ptr<NativeCertHandle> LoadNativeCertificateSkippingAttributes(std::string_view /*pem*/) {
-        return std::make_shared<NativeCertHandle>();
+        static auto dummy = std::make_shared<NativeCertHandle>();
+        return dummy;
     }
 
     // --------------------------------------- native handle serialisation helpers

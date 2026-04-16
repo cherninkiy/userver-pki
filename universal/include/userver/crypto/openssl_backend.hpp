@@ -45,6 +45,10 @@ struct OpenSslBackend {
     /// Idempotent OpenSSL initialisation (thread-safe).
     static void Init() noexcept;
 
+    /// Release global OpenSSL resources (calls `OPENSSL_cleanup` on OpenSSL
+    /// 1.1+).  Should be called once at process shutdown.
+    static void Cleanup() noexcept;
+
     // ------------------------------------------------------------ DSA sign
 
     /// Sign @p data with @p key using the algorithm selected by @p Type / @p Bits.
