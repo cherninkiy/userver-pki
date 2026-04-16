@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 
+#include <userver/crypto/backend_traits.hpp>
 #include <userver/crypto/basic_types.hpp>
 #include <userver/crypto/certificate.hpp>
 #include <userver/crypto/exception.hpp>
@@ -39,7 +40,7 @@ public:
 };
 
 /// HMAC-SHA verifier
-template <DigestSize Bits>
+template <DigestSize Bits, typename Backend = DefaultBackend>
 class HmacShaVerifier final : public Verifier {
 public:
     /// Constructor from a shared secret
@@ -62,11 +63,11 @@ using VerifierHs512 = HmacShaVerifier<DigestSize::k512>;
 /// @}
 
 /// Generic verifier for asymmetric cryptography
-template <DsaType Type, DigestSize Bits>
+template <DsaType Type, DigestSize Bits, typename Backend = DefaultBackend>
 class DsaVerifier final : public Verifier {
 public:
     /// Constructor from public key
-    explicit DsaVerifier(PublicKey pubkey);
+    explicit DsaVerifier(BasicPublicKey<Backend> pubkey);
 
     /// Constructor from a PEM-encoded public key or a X509 certificate
     explicit DsaVerifier(std::string_view pubkey);
@@ -81,7 +82,7 @@ public:
     void VerifyDigest(std::string_view digest, std::string_view raw_signature) const;
 
 private:
-    PublicKey pkey_;
+    BasicPublicKey<Backend> pkey_;
 };
 
 /// @name Verifies RSASSA signature using SHA-2 and PKCS1 padding.
@@ -138,14 +139,20 @@ private:
 
 namespace weak {
 
+/// @deprecated SHA-1 is cryptographically broken (NIST deprecated by Dec 2030).
+/// Use `VerifierRs256` or a stronger algorithm instead.
 /// Verifies RSASSA signature using SHA-1 and PKCS1 padding.
-using VerifierRs1 = DsaVerifier<DsaType::kRsa, DigestSize::k160>;
+[[deprecated("SHA-1 is cryptographically broken; use VerifierRs256 or stronger.")]]
+typedef DsaVerifier<DsaType::kRsa, DigestSize::k160> VerifierRs1;
 
+/// @deprecated SHA-1 is cryptographically broken (NIST deprecated by Dec 2030).
+/// Use `VerifierPs256` or a stronger algorithm instead.
 /// Verifies RSASSA signature using SHA-1 and PSS padding.
 ///
 /// JWA specifications require using MGF1 function with the same hash function
 /// as for the digest and salt length to be the same size as the hash output.
-using VerifierPs1 = DsaVerifier<DsaType::kRsaPss, DigestSize::k160>;
+[[deprecated("SHA-1 is cryptographically broken; use VerifierPs256 or stronger.")]]
+typedef DsaVerifier<DsaType::kRsaPss, DigestSize::k160> VerifierPs1;
 
 }  // namespace weak
 }  // namespace crypto
